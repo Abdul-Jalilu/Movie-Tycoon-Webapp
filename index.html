@@ -1,36 +1,213 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
   <title>Movie Tycoon</title>
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f4f4f4;
       text-align: center;
-      padding: 2rem;
-      background-color: #f0f0f0;
-    }
-    h1 {
-      color: #333;
+      padding: 20px;
     }
     button {
-      padding: 1rem 2rem;
-      font-size: 1.2rem;
-      background-color: #007bff;
-      color: white;
-      border: none;
-      border-radius: 8px;
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
       cursor: pointer;
     }
-    button:hover {
-      background-color: #0056b3;
+    #gameArea {
+      margin-top: 20px;
+    }
+    #leaderboardList {
+      list-style: none;
+      padding: 0;
+    }
+    #leaderboardList li {
+      margin: 5px 0;
+      font-weight: bold;
+    }
+    .gold { color: gold; }
+    .silver { color: silver; }
+    .bronze { color: #cd7f32; }
+    #playAgainBtn {
+      display: none;
+      background-color: #0078D7;
+      color: white;
+      border: none;
+    }
+    .actor-card {
+      display: inline-block;
+      margin: 10px;
+      cursor: pointer;
+    }
+    .actor-card img {
+      width: 100px;
+      height: 100px;
+      border-radius: 8px;
+    }
+    .genre-select {
+      margin: 10px;
     }
   </style>
 </head>
 <body>
-  <h1>🎬 Welcome to Movie Tycoon!</h1>
-  <p>Build your movie empire right here.</p>
-  <button onclick="alert('Coming soon: Your first blockbuster!')">Start Game</button>
+  <h1>🎬 Movie Tycoon</h1>
+  <button onclick="startGame()">Start Game</button>
+
+  <div id="gameArea" style="display:none;">
+    <h2>Round <span id="currentRound">1</span> of 5</h2>
+
+    <div>
+      <h3>Select a Studio</h3>
+      <button onclick="selectStudio('Universal')">Universal</button>
+      <button onclick="selectStudio('Paramount')">Paramount</button>
+      <button onclick="selectStudio('Indie')">Indie</button>
+    </div>
+
+    <div class="genre-select">
+      <h3>Select a Genre</h3>
+      <select id="genreDropdown">
+        <option value="Action">Action</option>
+        <option value="Drama">Drama</option>
+        <option value="Comedy">Comedy</option>
+      </select>
+    </div>
+
+    <div id="actorSelection" style="display:none;">
+      <h3>Select an Actor</h3>
+      <div class="actor-card" onclick="selectActor('Tom Cruise')">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Tom_Cruise_by_Gage_Skidmore_2.jpg" alt="Tom Cruise">
+        <p>Tom Cruise</p>
+      </div>
+      <div class="actor-card" onclick="selectActor('Zendaya')">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/3/3e/Zendaya_by_Gage_Skidmore_2.jpg" alt="Zendaya">
+        <p>Zendaya</p>
+      </div>
+      <div class="actor-card" onclick="selectActor('Ryan Reynolds')">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/6/6f/Ryan_Reynolds_by_Gage_Skidmore_2.jpg" alt="Ryan Reynolds">
+        <p>Ryan Reynolds</p>
+      </div>
+    </div>
+
+    <p id="movieResult"></p>
+
+    <h3>🏆 Leaderboard</h3>
+    <ul id="leaderboardList"></ul>
+
+    <button onclick="resetGame()">Reset Game</button>
+    <button onclick="clearLeaderboard()">Clear Leaderboard</button>
+    <button id="playAgainBtn" onclick="resetGame()">Play Again</button>
+  </div>
+
+  <audio id="scoreSound" src="https://www.soundjay.com/button/sounds/button-16.mp3" preload="auto"></audio>
+
+  <script>
+    let selectedStudio = null;
+    let leaderboard = JSON.parse(localStorage.getItem('leaderboard')) || [];
+    let currentRound = 1;
+    const maxRounds = 5;
+
+    function startGame() {
+      document.getElementById('gameArea').style.display = 'block';
+      updateLeaderboard();
+    }
+
+    function selectStudio(studio) {
+      if (currentRound > maxRounds) {
+        alert("🎬 Game over! Please reset to play again.");
+        return;
+      }
+      selectedStudio = studio;
+      document.getElementById('actorSelection').style.display = 'block';
+    }
+
+    function selectActor(actor) {
+      if (!selectedStudio || currentRound > maxRounds) return;
+
+      const genre = document.getElementById('genreDropdown').value;
+
+      const studioModifiers = {
+        "Universal": 10,
+        "Paramount": -5,
+        "Indie": 0
+      };
+
+      const genreBoosts = {
+        "Tom Cruise": "Action",
+        "Zendaya": "Drama",
+        "Ryan Reynolds": "Comedy"
+      };
+
+      let baseScore = Math.floor(Math.random() * 100) + 1;
+      let modifier = studioModifiers[selectedStudio] || 0;
+      let genreBonus = genreBoosts[actor] === genre ? 10 : 0;
+      let finalScore = Math.max(1, Math.min(100, baseScore + modifier + genreBonus));
+
+      let message = `${selectedStudio} picked ${actor} for a ${genre} film. Score: ${finalScore}/100`;
+      document.getElementById('movieResult').innerText = message;
+
+      document.getElementById('scoreSound').play();
+
+      leaderboard.push({ studio: selectedStudio, actor, genre, score: finalScore });
+      localStorage.setItem('leaderboard', JSON.stringify(leaderboard));
+      updateLeaderboard();
+
+      if (window.Telegram && window.Telegram.WebApp) {
+        window.Telegram.WebApp.sendData(message);
+      }
+
+      currentRound++;
+      document.getElementById('currentRound').innerText = currentRound;
+
+      if (currentRound > maxRounds) {
+        document.getElementById('actorSelection').style.display = 'none';
+        document.getElementById('movieResult').innerText += "\n🎉 Game Over!";
+        showFinalSummary();
+        document.getElementById('playAgainBtn').style.display = 'inline-block';
+      }
+    }
+
+    function updateLeaderboard() {
+      leaderboard.sort((a, b) => b.score - a.score);
+      const list = document.getElementById('leaderboardList');
+      list.innerHTML = '';
+
+      leaderboard.forEach((entry, index) => {
+        const item = document.createElement('li');
+        let medalClass = '';
+        if (index === 0) medalClass = 'gold';
+        else if (index === 1) medalClass = 'silver';
+        else if (index === 2) medalClass = 'bronze';
+        item.className = medalClass;
+        item.textContent = `${entry.studio} - ${entry.actor} (${entry.genre}): ${entry.score}/100`;
+        list.appendChild(item);
+      });
+    }
+
+    function showFinalSummary() {
+      const top = leaderboard.sort((a, b) => b.score - a.score)[0];
+      const summary = `🏆 Top Performer: ${top.actor} from ${top.studio} in ${top.genre} with ${top.score}/100`;
+      alert(summary);
+    }
+
+    function resetGame() {
+      selectedStudio = null;
+      currentRound = 1;
+      document.getElementById('actorSelection').style.display = 'none';
+      document.getElementById('movieResult').innerText = '';
+      document.getElementById('currentRound').innerText = currentRound;
+      document.getElementById('playAgainBtn').style.display = 'none';
+    }
+
+    function clearLeaderboard() {
+      leaderboard = [];
+      localStorage.removeItem('leaderboard');
+      updateLeaderboard();
+    }
+  </script>
 </body>
 </html>
+
