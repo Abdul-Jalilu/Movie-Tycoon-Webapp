@@ -104,109 +104,123 @@
 
   <audio id="scoreSound" src="https://www.soundjay.com/button/sounds/button-16.mp3" preload="auto"></audio>
 
-  <script>
-    let selectedStudio = null;
-    let leaderboard = JSON.parse(localStorage.getItem('leaderboard')) || [];
-    let currentRound = 1;
-    const maxRounds = 5;
+ <script>
+  let selectedStudio = null;
+  let leaderboard = JSON.parse(localStorage.getItem('leaderboard')) || [];
+  let currentRound = 1;
+  const maxRounds = 5;
 
-    function startGame() {
-      document.getElementById('gameArea').style.display = 'block';
-      updateLeaderboard();
+  function startGame() {
+    document.getElementById('gameArea').style.display = 'block';
+    updateLeaderboard();
+
+    // Confirm Telegram WebApp context
+    if (window.Telegram && window.Telegram.WebApp) {
+      console.log("✅ Telegram WebApp detected");
+      window.Telegram.WebApp.ready();
+    } else {
+      console.log("❌ Telegram WebApp not available");
+    }
+  }
+
+  function selectStudio(studio) {
+    if (currentRound > maxRounds) {
+      alert("🎬 Game over! Please reset to play again.");
+      return;
+    }
+    selectedStudio = studio;
+    document.getElementById('actorSelection').style.display = 'block';
+  }
+
+  function selectActor(actor) {
+    if (!selectedStudio || currentRound > maxRounds) return;
+
+    const genre = document.getElementById('genreDropdown').value;
+
+    const studioModifiers = {
+      "Universal": 10,
+      "Paramount": -5,
+      "Indie": 0
+    };
+
+    const genreBoosts = {
+      "Tom Cruise": "Action",
+      "Zendaya": "Drama",
+      "Ryan Reynolds": "Comedy"
+    };
+
+    let baseScore = Math.floor(Math.random() * 100) + 1;
+    let modifier = studioModifiers[selectedStudio] || 0;
+    let genreBonus = genreBoosts[actor] === genre ? 10 : 0;
+    let finalScore = Math.max(1, Math.min(100, baseScore + modifier + genreBonus));
+
+    let message = `${selectedStudio} picked ${actor} for a ${genre} film. Score: ${finalScore}/100`;
+    document.getElementById('movieResult').innerText = message;
+
+    document.getElementById('scoreSound').play();
+
+    leaderboard.push({ studio: selectedStudio, actor, genre, score: finalScore });
+    localStorage.setItem('leaderboard', JSON.stringify(leaderboard));
+    updateLeaderboard();
+
+    // Send data to Telegram WebApp
+    if (window.Telegram && window.Telegram.WebApp) {
+      window.Telegram.WebApp.sendData(message);
+      console.log("📤 Sent to Telegram:", message);
+    } else {
+      console.log("⚠️ Telegram WebApp not available. Data not sent.");
     }
 
-    function selectStudio(studio) {
-      if (currentRound > maxRounds) {
-        alert("🎬 Game over! Please reset to play again.");
-        return;
-      }
-      selectedStudio = studio;
-      document.getElementById('actorSelection').style.display = 'block';
-    }
+    currentRound++;
+    document.getElementById('currentRound').innerText = currentRound;
 
-    function selectActor(actor) {
-      if (!selectedStudio || currentRound > maxRounds) return;
-
-      const genre = document.getElementById('genreDropdown').value;
-
-      const studioModifiers = {
-        "Universal": 10,
-        "Paramount": -5,
-        "Indie": 0
-      };
-
-      const genreBoosts = {
-        "Tom Cruise": "Action",
-        "Zendaya": "Drama",
-        "Ryan Reynolds": "Comedy"
-      };
-
-      let baseScore = Math.floor(Math.random() * 100) + 1;
-      let modifier = studioModifiers[selectedStudio] || 0;
-      let genreBonus = genreBoosts[actor] === genre ? 10 : 0;
-      let finalScore = Math.max(1, Math.min(100, baseScore + modifier + genreBonus));
-
-      let message = `${selectedStudio} picked ${actor} for a ${genre} film. Score: ${finalScore}/100`;
-      document.getElementById('movieResult').innerText = message;
-
-      document.getElementById('scoreSound').play();
-
-      leaderboard.push({ studio: selectedStudio, actor, genre, score: finalScore });
-      localStorage.setItem('leaderboard', JSON.stringify(leaderboard));
-      updateLeaderboard();
-
-      if (window.Telegram && window.Telegram.WebApp) {
-        window.Telegram.WebApp.sendData(message);
-      }
-
-      currentRound++;
-      document.getElementById('currentRound').innerText = currentRound;
-
-      if (currentRound > maxRounds) {
-        document.getElementById('actorSelection').style.display = 'none';
-        document.getElementById('movieResult').innerText += "\n🎉 Game Over!";
-        showFinalSummary();
-        document.getElementById('playAgainBtn').style.display = 'inline-block';
-      }
-    }
-
-    function updateLeaderboard() {
-      leaderboard.sort((a, b) => b.score - a.score);
-      const list = document.getElementById('leaderboardList');
-      list.innerHTML = '';
-
-      leaderboard.forEach((entry, index) => {
-        const item = document.createElement('li');
-        let medalClass = '';
-        if (index === 0) medalClass = 'gold';
-        else if (index === 1) medalClass = 'silver';
-        else if (index === 2) medalClass = 'bronze';
-        item.className = medalClass;
-        item.textContent = `${entry.studio} - ${entry.actor} (${entry.genre}): ${entry.score}/100`;
-        list.appendChild(item);
-      });
-    }
-
-    function showFinalSummary() {
-      const top = leaderboard.sort((a, b) => b.score - a.score)[0];
-      const summary = `🏆 Top Performer: ${top.actor} from ${top.studio} in ${top.genre} with ${top.score}/100`;
-      alert(summary);
-    }
-
-    function resetGame() {
-      selectedStudio = null;
-      currentRound = 1;
+    if (currentRound > maxRounds) {
       document.getElementById('actorSelection').style.display = 'none';
-      document.getElementById('movieResult').innerText = '';
-      document.getElementById('currentRound').innerText = currentRound;
-      document.getElementById('playAgainBtn').style.display = 'none';
+      document.getElementById('movieResult').innerText += "\n🎉 Game Over!";
+      showFinalSummary();
+      document.getElementById('playAgainBtn').style.display = 'inline-block';
     }
+  }
 
-    function clearLeaderboard() {
-      leaderboard = [];
-      localStorage.removeItem('leaderboard');
-      updateLeaderboard();
-    }
+  function updateLeaderboard() {
+    leaderboard.sort((a, b) => b.score - a.score);
+    const list = document.getElementById('leaderboardList');
+    list.innerHTML = '';
+
+    leaderboard.forEach((entry, index) => {
+      const item = document.createElement('li');
+      let medalClass = '';
+      if (index === 0) medalClass = 'gold';
+      else if (index === 1) medalClass = 'silver';
+      else if (index === 2) medalClass = 'bronze';
+      item.className = medalClass;
+      item.textContent = `${entry.studio} - ${entry.actor} (${entry.genre}): ${entry.score}/100`;
+      list.appendChild(item);
+    });
+  }
+
+  function showFinalSummary() {
+    const top = leaderboard.sort((a, b) => b.score - a.score)[0];
+    const summary = `🏆 Top Performer: ${top.actor} from ${top.studio} in ${top.genre} with ${top.score}/100`;
+    alert(summary);
+  }
+
+  function resetGame() {
+    selectedStudio = null;
+    currentRound = 1;
+    document.getElementById('actorSelection').style.display = 'none';
+    document.getElementById('movieResult').innerText = '';
+    document.getElementById('currentRound').innerText = currentRound;
+    document.getElementById('playAgainBtn').style.display = 'none';
+  }
+
+  function clearLeaderboard() {
+    leaderboard = [];
+    localStorage.removeItem('leaderboard');
+    updateLeaderboard();
+  }
+</script>
+
   </script>
 </body>
 </html>
